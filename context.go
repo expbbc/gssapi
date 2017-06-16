@@ -148,6 +148,7 @@ wrap_gss_inquire_context(void *fp,
 import "C"
 
 import (
+	"log"
 	"runtime"
 	"time"
 )
@@ -289,6 +290,8 @@ func (lib *Lib) AcceptSecContext(
 		&flags,
 		&timerec,
 		&delegatedCredHandle.C_gss_cred_id_t)
+
+	log.Printf("From AcceptSecContext, maj %#v and min %#v", maj, min)
 
 	err = lib.stashLastStatus(maj, min)
 	if err != nil {

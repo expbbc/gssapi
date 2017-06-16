@@ -132,11 +132,13 @@ type ftable struct {
 	Fp_gss_import_sec_context    unsafe.Pointer
 
 	// credential.go
-	Fp_gss_acquire_cred         unsafe.Pointer
-	Fp_gss_add_cred             unsafe.Pointer
-	Fp_gss_inquire_cred         unsafe.Pointer
-	Fp_gss_inquire_cred_by_mech unsafe.Pointer
-	Fp_gss_release_cred         unsafe.Pointer
+	Fp_gss_acquire_cred                  unsafe.Pointer
+	Fp_gss_add_cred                      unsafe.Pointer
+	Fp_gss_acquire_cred_impersonate_name unsafe.Pointer
+	Fp_gss_add_cred_impersonate_name     unsafe.Pointer
+	Fp_gss_inquire_cred                  unsafe.Pointer
+	Fp_gss_inquire_cred_by_mech          unsafe.Pointer
+	Fp_gss_release_cred                  unsafe.Pointer
 
 	// message.go
 	Fp_gss_get_mic    unsafe.Pointer

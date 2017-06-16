@@ -4,6 +4,7 @@ package gssapi
 
 /*
 #include <gssapi/gssapi.h>
+#include <stdio.h>
 
 OM_uint32
 wrap_gss_acquire_cred(void *fp,
@@ -65,6 +66,83 @@ wrap_gss_add_cred(void *fp,
 	) fp)(
 		minor_status,
 		input_cred_handle,
+		desired_name,
+		desired_mech,
+		cred_usage,
+		initiator_time_req,
+		acceptor_time_req,
+		output_cred_handle,
+		actual_mechs,
+		initiator_time_rec,
+		acceptor_time_rec);
+}
+
+OM_uint32
+wrap_gss_acquire_cred_impersonate_name(void *fp,
+	OM_uint32 * minor_status,
+	const gss_cred_id_t impersonator_cred_handle,
+	const gss_name_t desired_name,
+	OM_uint32 time_req,
+	const gss_OID_set desired_mechs,
+	gss_cred_usage_t cred_usage,
+	gss_cred_id_t * output_cred_handle,
+	gss_OID_set * actual_mechs,
+	OM_uint32 * time_rec)
+{
+	return ((OM_uint32(*) (
+		OM_uint32 *,
+		const gss_cred_id_t,
+		const gss_name_t,
+		OM_uint32,
+		const gss_OID_set,
+		gss_cred_usage_t,
+		gss_cred_id_t *,
+		gss_OID_set *,
+		OM_uint32 *)
+	) fp)(
+		minor_status,
+		impersonator_cred_handle,
+		desired_name,
+		time_req,
+		desired_mechs,
+		cred_usage,
+		output_cred_handle,
+		actual_mechs,
+		time_rec);
+}
+
+OM_uint32
+wrap_gss_add_cred_impersonate_name(void *fp,
+	OM_uint32 * minor_status,
+	const gss_cred_id_t input_cred_handle,
+	const gss_cred_id_t impersonator_cred_handle,
+	const gss_name_t desired_name,
+	const gss_OID desired_mech,
+	gss_cred_usage_t cred_usage,
+	OM_uint32 initiator_time_req,
+	OM_uint32 acceptor_time_req,
+	gss_cred_id_t * output_cred_handle,
+	gss_OID_set * actual_mechs,
+	OM_uint32 * initiator_time_rec,
+	OM_uint32 * acceptor_time_rec)
+{
+	return ((OM_uint32(*) (
+		OM_uint32 *,
+		gss_cred_id_t,
+		const gss_cred_id_t,
+		const gss_name_t,
+		const gss_OID,
+		gss_cred_usage_t,
+		OM_uint32,
+		OM_uint32,
+		gss_cred_id_t *,
+		gss_OID_set *,
+		OM_uint32 *,
+		OM_uint32 *)
+	) fp)(
+		minor_status,
+		input_cred_handle,
+		impersonator_cred_handle,
 		desired_name,
 		desired_mech,
 		cred_usage,
@@ -205,6 +283,80 @@ func (lib *Lib) AddCred(inputCredHandle *CredId,
 	maj := C.wrap_gss_add_cred(lib.Fp_gss_add_cred,
 		&min,
 		inputCredHandle.C_gss_cred_id_t,
+		desiredName.C_gss_name_t,
+		desiredMech.C_gss_OID,
+		C.gss_cred_usage_t(credUsage),
+		C.OM_uint32(initiatorTimeReq.Seconds()),
+		C.OM_uint32(acceptorTimeReq.Seconds()),
+		&outputCredHandle.C_gss_cred_id_t,
+		&actualMechs.C_gss_OID_set,
+		&initSeconds,
+		&acceptSeconds)
+
+	err = lib.stashLastStatus(maj, min)
+	if err != nil {
+		return nil, nil, 0, 0, err
+	}
+
+	return outputCredHandle,
+		actualMechs,
+		time.Duration(initSeconds) * time.Second,
+		time.Duration(acceptSeconds) * time.Second,
+		nil
+}
+
+// AcquireCredImpersonate implements gss_acquire_cred_impersonate_name, as per
+// https://k5wiki.kerberos.org/wiki/Projects/Services4User#gss_acquire_cred_impersonate_name
+// No RFC is available, but MS-SFU summarises the extension behaviour
+func (lib *Lib) AcquireCredImpersonate(impersonateCredHandle *CredId,
+	desiredName *Name, timeReq time.Duration, desiredMechs *OIDSet,
+	credUsage CredUsage) (outputCredHandle *CredId,
+	actualMechs *OIDSet, timeRec time.Duration, err error) {
+
+	min := C.OM_uint32(0)
+	actualMechs = lib.NewOIDSet()
+	outputCredHandle = lib.NewCredId()
+	timerec := C.OM_uint32(0)
+
+	maj := C.wrap_gss_acquire_cred_impersonate_name(lib.Fp_gss_acquire_cred_impersonate_name,
+		&min,
+		impersonateCredHandle.C_gss_cred_id_t,
+		desiredName.C_gss_name_t,
+		C.OM_uint32(timeReq.Seconds()),
+		desiredMechs.C_gss_OID_set,
+		C.gss_cred_usage_t(credUsage),
+		&outputCredHandle.C_gss_cred_id_t,
+		&actualMechs.C_gss_OID_set,
+		&timerec)
+
+	err = lib.stashLastStatus(maj, min)
+	if err != nil {
+		return nil, nil, 0, err
+	}
+
+	return outputCredHandle, actualMechs, time.Duration(timerec) * time.Second, nil
+}
+
+// AddCredImpersonate implements gss_add_cred_impersonate_name, as per
+// https://k5wiki.kerberos.org/wiki/Projects/Services4User#gss_add_cred_impersonate_name
+// No RFC is available, but MS-SFU summarises the extension behaviour
+func (lib *Lib) AddCredImpersonate(inputCredHandle *CredId,
+	impersonateCredHandle *CredId, desiredName *Name, desiredMech *OID,
+	credUsage CredUsage, initiatorTimeReq time.Duration,
+	acceptorTimeReq time.Duration) (outputCredHandle *CredId,
+	actualMechs *OIDSet, initiatorTimeRec time.Duration,
+	acceptorTimeRec time.Duration, err error) {
+
+	min := C.OM_uint32(0)
+	actualMechs = lib.NewOIDSet()
+	outputCredHandle = lib.NewCredId()
+	initSeconds := C.OM_uint32(0)
+	acceptSeconds := C.OM_uint32(0)
+
+	maj := C.wrap_gss_add_cred_impersonate_name(lib.Fp_gss_add_cred_impersonate_name,
+		&min,
+		inputCredHandle.C_gss_cred_id_t,
+		impersonateCredHandle.C_gss_cred_id_t,
 		desiredName.C_gss_name_t,
 		desiredMech.C_gss_OID,
 		C.gss_cred_usage_t(credUsage),
